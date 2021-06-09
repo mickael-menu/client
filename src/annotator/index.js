@@ -20,6 +20,7 @@ registerIcons(iconSet);
 import { getConfig } from './config/index';
 import Guest from './guest';
 import Notebook from './notebook';
+import { FrameConnector } from './communicator';
 import Sidebar from './sidebar';
 import { EventBus } from './util/emitter';
 
@@ -37,12 +38,9 @@ function init() {
   const annotatorConfig = getConfig('annotator');
   const isPDF = typeof window_.PDFViewerApplication !== 'undefined';
 
-  if (annotatorConfig.subFrameIdentifier) {
-    // Other modules use this to detect if this
-    // frame context belongs to hypothesis.
-    // Needs to be a global property that's set.
-    window_.__hypothesis_frame = true;
-  }
+  let frameConnector = /** @type {FrameConnector?} */ (null);
+  let sidebar = /** @type {Sidebar?} */ (null);
+  let notebook = /** @type {Notebook?} */ (null);
 
   const eventBus = new EventBus();
   const guest = new Guest(document.body, eventBus, {
@@ -51,17 +49,33 @@ function init() {
     // nb. documentType is an internal config property only
     documentType: isPDF ? 'pdf' : 'html',
   });
-  const sidebar = !annotatorConfig.subFrameIdentifier
-    ? new Sidebar(document.body, eventBus, guest, getConfig('sidebar'))
-    : null;
-  // Clear `annotations` value from the notebook's config to prevent direct-linked
-  // annotations from filtering the threads.
-  const notebook = new Notebook(document.body, eventBus, getConfig('notebook'));
+
+  if (annotatorConfig.subFrameIdentifier) {
+    // Other modules use this to detect if this
+    // frame context belongs to hypothesis.
+    // Needs to be a global property that's set.
+    window_.__hypothesis_frame = true;
+  } else {
+    const sidebarConfig = getConfig('sidebar');
+
+    const { sidebarAppUrl } = sidebarConfig;
+    frameConnector = new FrameConnector({
+      sidebarAppUrl,
+    });
+    frameConnector.listen();
+
+    sidebar = new Sidebar(document.body, eventBus, guest, sidebarConfig);
+
+    // Clear `annotations` value from the notebook's config to prevent direct-linked
+    // annotations from filtering the threads.
+    notebook = new Notebook(document.body, eventBus, getConfig('notebook'));
+  }
 
   appLinkEl.addEventListener('destroy', () => {
-    sidebar?.destroy();
-    notebook.destroy();
     guest.destroy();
+    frameConnector?.destroy();
+    sidebar?.destroy();
+    notebook?.destroy();
 
     // Remove all the `<link>`, `<script>` and `<style>` elements added to the
     // page by the boot script.
