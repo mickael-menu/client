@@ -24,7 +24,7 @@ import { FrameConnector } from './communicator';
 import Sidebar from './sidebar';
 import { EventBus } from './util/emitter';
 
-const window_ = /** @type {HypothesisWindow} */ (window);
+const _window = /** @type {HypothesisWindow} */ (window);
 
 // Look up the URL of the sidebar. This element is added to the page by the
 // boot script before the "annotator" bundle loads.
@@ -50,11 +50,11 @@ function init() {
   if (annotatorConfig.subFrameIdentifier) {
     // Other modules use this to detect if this frame context belongs to hypothesis.
     // Needs to be a global property.
-    Object.defineProperty(window_, '__hypothesis_frame', { value: true });
+    Object.defineProperty(_window, '__hypothesis_frame', { value: true });
     hostPort = null;
   }
 
-  const isPDF = typeof window_.PDFViewerApplication !== 'undefined';
+  const isPDF = typeof _window.PDFViewerApplication !== 'undefined';
 
   let sidebar = /** @type {Sidebar?} */ (null);
   let notebook = /** @type {Notebook?} */ (null);
@@ -67,7 +67,7 @@ function init() {
     documentType: isPDF ? 'pdf' : 'html',
   });
 
-  if (!window_.__hypothesis_frame) {
+  if (!_window.__hypothesis_frame) {
     frameConnector.listen();
 
     sidebar = new Sidebar(document.body, eventBus, guest, sidebarConfig);
