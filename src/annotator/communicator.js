@@ -177,7 +177,36 @@ export class FrameConnector {
     this._listeners = new ListenerCollection();
   }
 
+  /**
+   * Returns a port from a channel. Currently, only returns the `host` port from
+   * the `hostToSidebar` channel. Otherwise, it returns `null`.
+   *
+   * @param {object} options
+   *   @param {'hostToSidebar'} options.channel
+   *   @param {'host'} options.port
+   */
+  getPort({ channel, port }) {
+    if (channel === 'hostToSidebar' && port === 'host') {
+      return this._channels.hostToSidebar.port1;
+    }
+
+    return null;
+  }
+
   listen() {
+    // Listen and respond to the request of the `sidebar` port from `hostToSidebar` channel
+    this._listeners.add(window, 'message', event =>
+      this._handleMessage(/** @type {MessageEvent} */ (event), {
+        allowedOrigin: this._sidebarAndNotebookAppOrigin,
+        message: {
+          channel: 'hostToSidebar',
+          port: 'sidebar',
+          type: 'request',
+        },
+        port: this._channels.hostToSidebar.port2,
+      })
+    );
+
     // Listen and respond to the request of the `notebook` port from `notebookToSidebar` channel
     this._listeners.add(window, 'message', event =>
       this._handleMessage(/** @type {MessageEvent} */ (event), {
@@ -271,7 +300,7 @@ export class PortFinder {
    * polling necessary because the `guest` frame could be loaded before the `host` frame
    * @typedef {{channel: 'guestToSidebar', hostFrame: Window, port: 'guest', subFrameIdentifier: string}} options0
    *
-   * host <-> sidebar TODO
+   * host <-> sidebar
    * @typedef {{channel: 'hostToSidebar', hostFrame: Window, port: 'sidebar'}} options1
    *
    * notebook <-> sidebar
@@ -284,6 +313,12 @@ export class PortFinder {
    */
   discover(options) {
     return new Promise((resolve, reject) => {
+      // `host` <-> `sidebar` communication
+      if (options.channel === 'hostToSidebar' && options.port === 'sidebar') {
+        this._requestPortAndListenForAnswer({ ...options, reject, resolve });
+        return;
+      }
+
       // `notebook` <-> `sidebar` communication
       if (
         options.channel === 'notebookToSidebar' &&
